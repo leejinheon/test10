@@ -1,103 +1,70 @@
-# app.py
 import streamlit as st
 import random
-import matplotlib.pyplot as plt
+import pandas as pd
+import plotly.graph_objects as go
 
-# 함수 정의
-def get_computer_choice():
-    return random.choice(["가위", "바위", "보"])
+st.title('가위바위보 게임')
 
+# 사용자와 컴퓨터가 선택할 수 있는 옵션
+choices = ['가위', '바위', '보']
+
+# 게임 결과 저장을 위한 데이터프레임 초기화
+if 'results' not in st.session_state:
+    st.session_state['results'] = pd.DataFrame(columns=['user', 'computer', 'result'])
+
+# 승패 결정 함수
 def determine_winner(player, computer):
     if player == computer:
-        return "draw"
-    elif (player == "가위" and computer == "보") or \
-         (player == "바위" and computer == "가위") or \
-         (player == "보" and computer == "바위"):
-        return "player"
+        return '비김'
+    elif (player == '가위' and computer == '보') or (player == '바위' and computer == '가위') or (player == '보' and computer == '바위'):
+        return '사용자 승리'
     else:
-        return "computer"
+        return '컴퓨터 승리'
 
-def update_score(winner):
-    if winner == "player":
-        st.session_state.player_wins += 1
-    elif winner == "computer":
-        st.session_state.computer_wins += 1
+st.subheader('가위바위보 게임을 시작해보세요!')
 
-def calculate_win_rate():
-    total_games = st.session_state.player_wins + st.session_state.computer_wins + st.session_state.draws
-    if total_games == 0:
-        return 0, 0
-    player_win_rate = st.session_state.player_wins / total_games * 100
-    computer_win_rate = st.session_state.computer_wins / total_games * 100
-    return player_win_rate, computer_win_rate
+# 사용자가 선택할 수 있는 버튼 추가
+player_choice = st.radio("당신의 선택은?", choices)
 
-def initialize_session_state():
-    if 'player_wins' not in st.session_state:
-        st.session_state.player_wins = 0
-    if 'computer_wins' not in st.session_state:
-        st.session_state.computer_wins = 0
-    if 'draws' not in st.session_state:
-        st.session_state.draws = 0
-    if 'game_history' not in st.session_state:
-        st.session_state.game_history = []
+# 컴퓨터의 선택은 무작위로 결정
+if st.button('결과 확인'):
+    computer_choice = random.choice(choices)
+    st.write(f'컴퓨터의 선택: {computer_choice}')
+    result = determine_winner(player_choice, computer_choice)
+    st.write(f'결과: {result}')
 
-def plot_pie_chart(player_wins, computer_wins, draws):
-    labels = ['Player Wins', 'Computer Wins', 'Draws']
-    sizes = [player_wins, computer_wins, draws]
-    colors = ['#ff9999','#66b3ff','#99ff99']
-    explode = (0.1, 0, 0)  # explode 1st slice
-    
-    fig1, ax1 = plt.subplots()
-    ax1.pie(sizes, explode=explode, labels=labels, colors=colors, autopct='%1.1f%%',
-            shadow=True, startangle=90)
-    ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-    
-    st.pyplot(fig1)
+    # 결과를 데이터프레임에 저장
+    new_result = pd.DataFrame([[player_choice, computer_choice, result]], columns=['user', 'computer', 'result'])
+    st.session_state['results'] = pd.concat([st.session_state['results'], new_result], ignore_index=True)
 
-# Streamlit 앱 설정
-st.title("가위바위보 게임")
-st.write("가위, 바위, 보 중 하나를 선택하세요.")
+# 게임 결과 시각화
+if not st.session_state['results'].empty:
+    st.subheader('게임 결과 통계')
 
-# 세션 상태 초기화
-initialize_session_state()
+    # 전체 결과 데이터프레임 출력
+    st.write(st.session_state['results'])
 
-# 사용자의 선택
-user_choice = st.selectbox("가위, 바위, 보 중 하나를 선택하세요", ["가위", "바위", "보"])
+    # 결과 통계 시각화
+    result_counts = st.session_state['results']['result'].value_counts().reset_index()
+    user_choice_counts = st.session_state['results']['user'].value_counts().reset_index()
+    computer_choice_counts = st.session_state['results']['computer'].value_counts().reset_index()
 
-if st.button("결과 확인"):
-    computer_choice = get_computer_choice()
-    winner = determine_winner(user_choice, computer_choice)
-    
-    if winner == "draw":
-        st.session_state.draws += 1
-    else:
-        update_score(winner)
-    
-    st.session_state.game_history.append({
-        "user": user_choice,
-        "computer": computer_choice,
-        "result": winner
-    })
+    result_counts.columns = ['result', 'count']
+    user_choice_counts.columns = ['user', 'count']
+    computer_choice_counts.columns = ['computer', 'count']
 
-    st.write(f"당신의 선택: {user_choice}")
-    st.write(f"컴퓨터의 선택: {computer_choice}")
-    if winner == "draw":
-        st.write("비겼습니다!")
-    elif winner == "player":
-        st.write("당신이 이겼습니다!")
-    else:
-        st.write("컴퓨터가 이겼습니다!")
+    def plot_pie(data, names, values, title):
+        fig = go.Figure(data=[go.Pie(labels=data[names], values=data[values])])
+        fig.update_layout(title=title, margin=dict(l=20, r=20, t=40, b=20))
+        return fig
 
-    player_win_rate, computer_win_rate = calculate_win_rate()
-    st.write(f"사용자의 승률: {player_win_rate:.2f}%")
-    st.write(f"컴퓨터의 승률: {computer_win_rate:.2f}%")
+    col1, col2, col3 = st.columns(3)
 
-    st.write("경기 기록:")
-    for idx, game in enumerate(st.session_state.game_history, 1):
-        st.write(f"게임 {idx}: 당신의 선택: {game['user']}, 컴퓨터의 선택: {game['computer']}, 결과: {'비김' if game['result'] == 'draw' else ('당신이 이김' if game['result'] == 'player' else '컴퓨터가 이김')}")
+    with col1:
+        st.plotly_chart(plot_pie(result_counts, 'result', 'count', '게임 결과'), use_container_width=True)
 
-    plot_pie_chart(st.session_state.player_wins, st.session_state.computer_wins, st.session_state.draws)
+    with col2:
+        st.plotly_chart(plot_pie(user_choice_counts, 'user', 'count', '사용자 선택 통계'), use_container_width=True)
 
-# Streamlit 앱 실행
-if __name__ == "__main__":
-    st.run()
+    with col3:
+        st.plotly_chart(plot_pie(computer_choice_counts, 'computer', 'count', '컴퓨터 선택 통계'), use_container_width=True)
