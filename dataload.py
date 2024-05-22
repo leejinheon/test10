@@ -1,51 +1,63 @@
+# app.py
 import streamlit as st
-import pandas as pd
-import numpy as np
+import random
 
-st.title('Uber pickups in NYC')
+# 함수 정의
+def get_computer_choice():
+    return random.choice(["묵", "찌", "빠"])
 
-DATE_COLUMN = 'date/time'
-DATA_URL = ('https://s3-us-west-2.amazonaws.com/'
-         'streamlit-demo-data/uber-raw-data-sep14.csv.gz')
+def determine_winner(player, computer, turn):
+    if player == computer:
+        return "승리" if turn == "player" else "패배"
+    if (player == "묵" and computer == "빠") or (player == "찌" and computer == "묵") or (player == "빠" and computer == "찌"):
+        return "승리" if turn == "player" else "패배"
+    return "패배" if turn == "player" else "승리"
 
-# 데이터 불러오기
-def load_data(nrows):
-    data = pd.read_csv(DATA_URL, nrows=nrows)
-    lowercase = lambda x: str(x).lower()
-    data.rename(lowercase, axis='columns', inplace=True)
-    data[DATE_COLUMN] = pd.to_datetime(data[DATE_COLUMN])
-    return data
+# Streamlit 앱 설정
+st.title("묵찌빠 게임")
+st.write("묵찌빠 게임을 시작합니다!")
 
-# 텍스트 요소 생성. 사용자에게 데이터가 로드 되고 있음을 알린다.
-data_load_state = st.text('Loading data...')
+# 사용자의 선택
+user_choice = st.selectbox("묵찌빠 중 하나를 선택하세요", ["묵", "찌", "빠"])
 
-# 10000개의 행의 데이터를 로드한다.
-data = load_data(10000)
+# 상태 초기화
+if 'turn' not in st.session_state:
+    st.session_state.turn = 'player'
+if 'result' not in st.session_state:
+    st.session_state.result = None
 
-# 데이터가 성공적으로 로드 되었음을 알린다.
-data_load_state.text('Loading data...done!')
+# 게임 로직
+if st.button("결과 확인"):
+    computer_choice = get_computer_choice()
+    st.write(f"컴퓨터의 선택: {computer_choice}")
+    
+    if st.session_state.turn == 'player':
+        result = determine_winner(user_choice, computer_choice, st.session_state.turn)
+        st.write(f"결과: {result}")
+        if result == "승리":
+            st.write("당신이 이겼습니다!")
+            st.session_state.turn = 'computer'
+        else:
+            st.write("당신이 졌습니다. 컴퓨터가 다음 턴을 가져갑니다.")
+            st.session_state.turn = 'computer'
+    else:
+        result = determine_winner(computer_choice, user_choice, st.session_state.turn)
+        st.write(f"결과: {result}")
+        if result == "승리":
+            st.write("컴퓨터가 이겼습니다!")
+            st.session_state.turn = 'player'
+        else:
+            st.write("컴퓨터가 졌습니다. 당신이 다음 턴을 가져갑니다.")
+            st.session_state.turn = 'player'
 
-# 부제목 만들기
-st.subheader('Raw data')
-st.write(data)
+    st.session_state.result = result
 
-# 히스토그램 만들기
-st.subheader('Number of pickups by hour')
-hist_values = np.histogram(data[DATE_COLUMN].dt.hour, bins=24, range=(0,24))[0]
-st.bar_chart(hist_values)
+# 상태 리셋 버튼
+if st.button("게임 리셋"):
+    st.session_state.turn = 'player'
+    st.session_state.result = None
+    st.write("게임이 리셋되었습니다.")
 
-# 시간별 라인 차트
-st.subheader('Number of pickups by hour (line chart)')
-hourly_counts = data[DATE_COLUMN].dt.hour.value_counts().sort_index()
-st.line_chart(hourly_counts)
-
-# 맵 시각화
-st.subheader('Map of all pickups')
-st.map(data)
-
-# 사용자에게 특정 시간대의 데이터를 필터링할 수 있도록 입력을 받는 슬라이더 추가
-hour_to_filter = st.slider('hour', 0, 23, 17)
-filtered_data = data[data[DATE_COLUMN].dt.hour == hour_to_filter]
-
-st.subheader(f'Map of all pickups at {hour_to_filter}:00')
-st.map(filtered_data)
+# Streamlit 앱 실행
+if __name__ == "__main__":
+    st.run()
